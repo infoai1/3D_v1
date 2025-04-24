@@ -1,33 +1,23 @@
 import json, streamlit as st
 import streamlit.components.v1 as components
+from pathlib import Path
 
-# read your graph
-with open("graph.json", "r", encoding="utf-8") as f:
-    data = json.load(f)
+# ---- load data ----
+GRAPH = json.loads(Path("graph.json").read_text(encoding="utf-8"))
 
-# build the standalone HTML page
-html = f"""
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <style>
-    html,body,#graph{{margin:0;width:100%;height:100%;background:#000;}}
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
-</head>
-<body>
-  <div id="graph"></div>
-  <script>
-    const Graph = ForceGraph3D({{controlType:'orbit'}})(document.getElementById('graph'))
-      .graphData({json.dumps(data)})
-      .nodeLabel(d => d.text || d.label)
-      .nodeAutoColorBy('type')
-      .linkDirectionalParticles(2)
-      .linkDirectionalParticleSpeed(0.005);
-  </script>
-</body>
-</html>
-"""
+# ---- sidebar filters ----
+st.sidebar.header("Filters")
+all_cats = sorted({n["category"] for n in GRAPH["nodes"] if n["type"]=="chunk"})
+all_doms = sorted({n["domain"]   for n in GRAPH["nodes"] if n["type"]=="chunk"})
 
-components.html(html, height=700, scrolling=False)
+sel_cats = st.sidebar.multiselect("Reference Category", all_cats, default=all_cats)
+sel_doms = st.sidebar.multiselect("Reference Domain",   all_doms, default=all_doms)
+
+# ---- build HTML with injected data ----
+template = Path("graph_template.html").read_text(encoding="utf-8")
+html = template.replace("{{GRAPH_DATA}}", json.dumps(GRAPH)\
+                ).replace("{{FILTERS}}", json.dumps({"categories":sel_cats,
+                                                     "domains":sel_doms,
+                                                     "query":""}))
+
+components.html(html, height=800, scrolling=False)
