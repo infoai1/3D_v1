@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <style>
+    html,body{margin:0;height:100%;width:100%;background:#000;font-family:arial}
+    #graph{height:100%}
+    #infoPanel{position:fixed;top:10px;right:10px;max-width:30%;max-height:90%;
+               overflow:auto;background:#111c;border:1px solid #555;color:#fff;
+               padding:10px;border-radius:6px;font-size:14px;display:none}
+    #toolbar{position:fixed;top:10px;left:10px;z-index:2}
+    #toolbar input{padding:4px;border-radius:4px;border:1px solid #777}
+    #toolbar button{margin-left:6px;padding:5px 8px}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/3d-force-graph"></script>
+</head>
+<body>
+<div id="toolbar">
+  <input id="searchBox" placeholder="Search…"/>
+  <button id="snapBtn">📷 Snapshot</button>
+</div>
+<div id="graph"></div>
+<div id="infoPanel"></div>
+
+<script>
+const DATA = {{GRAPH_DATA}};
+const filters = {{FILTERS}};
+
+// -------- helper: apply filters --------
+function filterData(data){
+  const nodes = data.nodes.filter(n=>{
+    if(n.type!=='chunk') return true;           // keep all tags
+    const catOk = !filters.categories.length || filters.categories.includes(n.category);
+    const domOk = !filters.domains.length    || filters.domains.includes(n.domain);
+    const searchOk = !filters.query || (n.text||'').toLowerCase().includes(filters.query.toLowerCase());
+    return catOk && domOk && searchOk;
+  });
+  const nodeIds = new Set(nodes.map(n=>n.id));
+  const links = data.links.filter(l=>nodeIds.has(l.source)&&nodeIds.has(l.target));
+  return {nodes,links};
+}
+
+// -------- build graph --------
+let Graph = ForceGraph3D({controlType:'orbit'})(document.getElementById('graph'))
+  .nodeLabel(d=>d.text||d.label)
+  .nodeAutoColorBy('type')
+  .linkDirectionalParticles(2)
+  .linkDirectionalParticleSpeed(0.008)
+  .onNodeClick(showDetails);
+
+Graph.graphData(filterData(DATA));
+
+// -------- UI: details panel --------
+function showDetails(node){
+  if(node.type!=='chunk') return;
+  const p=document.getElementById('infoPanel');
+  p.innerHTML = `<b>${node.label}</b><br><br>${(node.text||'').replace(/\n/g,'<br>')}
+                 <hr>Category: ${node.category}<br>Domain: ${node.domain}`;
+  p.style.display='block';
+}
+
+// -------- UI: search --------
+document.getElementById('searchBox').addEventListener('keyup',e=>{
+  filters.query = e.target.value.trim();
+  Graph.graphData(filterData(DATA));
+});
+
+// -------- UI: snapshot --------
+document.getElementById('snapBtn').onclick=()=>{
+  const link = document.createElement('a');
+  link.download = 'graph.png';
+  link.href = Graph.renderer().domElement.toDataURL('image/png');
+  link.click();
+};
+</script>
+</body>
+</html>
